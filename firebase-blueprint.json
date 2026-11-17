@@ -1,0 +1,160 @@
+{
+  "entities": {
+    "EmailBackupHeader": {
+      "title": "EmailBackupHeader",
+      "description": "Cloud backup metadata, profile, and application settings linked to the user's verified email account for recovery across app deletion or sign-out.",
+      "type": "object",
+      "properties": {
+        "ownerUid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the backup owner",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Normalized email address bound to this backup",
+          "minLength": 3,
+          "maxLength": 254
+        },
+        "appVersion": {
+          "type": "string",
+          "description": "Application version when backup was created",
+          "minLength": 1,
+          "maxLength": 24
+        },
+        "deviceName": {
+          "type": "string",
+          "description": "Source phone or browser label",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "checksum": {
+          "type": "string",
+          "description": "SHA-256 hex digest verifying backup integrity",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "messagesCount": {
+          "type": "integer",
+          "description": "Total number of backed-up messages"
+        },
+        "conversationsCount": {
+          "type": "integer",
+          "description": "Total number of backed-up conversations"
+        },
+        "contactsCount": {
+          "type": "integer",
+          "description": "Total number of backed-up synced contacts"
+        },
+        "autoBackupOnExit": {
+          "type": "boolean",
+          "description": "Whether automatic backup runs before sign-out and periodically"
+        },
+        "profile": {
+          "type": "object",
+          "description": "User profile summary map"
+        },
+        "settings": {
+          "type": "object",
+          "description": "Application settings map"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of initial backup creation"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of latest backup update"
+        }
+      },
+      "required": [
+        "ownerUid",
+        "email",
+        "appVersion",
+        "deviceName",
+        "checksum",
+        "messagesCount",
+        "conversationsCount",
+        "contactsCount",
+        "autoBackupOnExit",
+        "profile",
+        "settings",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "BackupChunk": {
+      "title": "BackupChunk",
+      "description": "Structured backup chunk storing conversations, contacts, or conversation preferences under an owner's backup.",
+      "type": "object",
+      "properties": {
+        "ownerUid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the backup owner",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "kind": {
+          "type": "string",
+          "description": "Category of backed up records",
+          "enum": ["conversations", "contacts", "preferences", "statuses"]
+        },
+        "chunkIndex": {
+          "type": "integer",
+          "description": "Zero-based index of the chunk"
+        },
+        "data": {
+          "type": "object",
+          "description": "Native Firestore map containing structured records for recovery"
+        },
+        "checksum": {
+          "type": "string",
+          "description": "SHA-256 integrity hash of this chunk",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of chunk creation"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of latest chunk update"
+        }
+      },
+      "required": [
+        "ownerUid",
+        "kind",
+        "chunkIndex",
+        "data",
+        "checksum",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/backups/{userId}": {
+      "schema": {
+        "$ref": "#/entities/EmailBackupHeader"
+      },
+      "description": "Owner-isolated email cloud backup header containing metadata, profile, and app preferences"
+    },
+    "/backups/{userId}/chunks/{chunkId}": {
+      "schema": {
+        "$ref": "#/entities/BackupChunk"
+      },
+      "description": "Owner-isolated subcollection of structured chat, contact, and preference backup chunks"
+    }
+  }
+}

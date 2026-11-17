@@ -1,0 +1,6 @@
+{
+  "name": "WhatsApp Pro AI - واتساب الذكي",
+  "description": "تطبيق تواصل اجتماعي متطور يشبه واتساب مع مساعد ذكاء اصطناعي مدمج، حالات، مكالمات، وميزات متكاملة.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

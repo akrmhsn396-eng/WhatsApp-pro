@@ -1,0 +1,159 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidBackupProfile(p) {
+      return p is map &&
+        p.keys().hasAll(['name', 'about', 'avatar']) &&
+        p.keys().hasOnly(['name', 'about', 'avatar']) &&
+        p.name is string && p.name.size() >= 1 && p.name.size() <= 100 &&
+        p.about is string && p.about.size() <= 300 &&
+        p.avatar is string && p.avatar.size() <= 2048;
+    }
+
+    function isValidBackupSettings(s) {
+      return s is map &&
+        s.keys().hasAll(['darkMode', 'readReceipts', 'soundsEnabled', 'enterToSend', 'lastSeenPrivacy', 'wallpaper']) &&
+        s.keys().hasOnly(['darkMode', 'readReceipts', 'soundsEnabled', 'enterToSend', 'lastSeenPrivacy', 'wallpaper', 'autoSyncContacts', 'desktopNotifications']) &&
+        s.darkMode is bool &&
+        s.readReceipts is bool &&
+        s.soundsEnabled is bool &&
+        s.enterToSend is bool &&
+        s.lastSeenPrivacy in ['everyone', 'contacts', 'nobody'] &&
+        s.wallpaper in ['default', 'emerald', 'slate', 'sand'] &&
+        (!('autoSyncContacts' in s) || s.autoSyncContacts is bool) &&
+        (!('desktopNotifications' in s) || s.desktopNotifications is bool);
+    }
+
+    function isValidEmailBackupHeader(data, userId) {
+      return data.keys().hasAll([
+          'ownerUid', 'email', 'appVersion', 'deviceName', 'checksum',
+          'messagesCount', 'conversationsCount', 'contactsCount',
+          'autoBackupOnExit', 'profile', 'settings', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerUid', 'email', 'appVersion', 'deviceName', 'checksum',
+          'messagesCount', 'conversationsCount', 'contactsCount',
+          'autoBackupOnExit', 'profile', 'settings', 'createdAt', 'updatedAt'
+        ]) &&
+        data.ownerUid is string &&
+        isValidId(data.ownerUid) &&
+        data.ownerUid == userId &&
+        data.ownerUid == request.auth.uid &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        data.appVersion is string && data.appVersion.size() >= 1 && data.appVersion.size() <= 24 &&
+        data.deviceName is string && data.deviceName.size() >= 1 && data.deviceName.size() <= 100 &&
+        data.checksum is string && data.checksum.size() == 64 && data.checksum.matches('^[a-f0-9]{64}$') &&
+        data.messagesCount is int && data.messagesCount >= 0 && data.messagesCount <= 500000 &&
+        data.conversationsCount is int && data.conversationsCount >= 0 && data.conversationsCount <= 50000 &&
+        data.contactsCount is int && data.contactsCount >= 0 && data.contactsCount <= 50000 &&
+        data.autoBackupOnExit is bool &&
+        isValidBackupProfile(data.profile) &&
+        isValidBackupSettings(data.settings) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isParentBackupOwner(userId) {
+      return get(/databases/$(database)/documents/backups/$(userId)).data.ownerUid == request.auth.uid;
+    }
+
+    function isValidBackupChunk(data, userId) {
+      return data.keys().hasAll(['ownerUid', 'kind', 'chunkIndex', 'data', 'checksum', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['ownerUid', 'kind', 'chunkIndex', 'data', 'checksum', 'createdAt', 'updatedAt']) &&
+        data.ownerUid is string &&
+        isValidId(data.ownerUid) &&
+        data.ownerUid == userId &&
+        data.ownerUid == request.auth.uid &&
+        data.kind in ['conversations', 'contacts', 'preferences', 'statuses'] &&
+        data.chunkIndex is int && data.chunkIndex >= 0 && data.chunkIndex <= 500 &&
+        data.data is map && data.data.keys().size() <= 50 &&
+        data.checksum is string && data.checksum.size() == 64 && data.checksum.matches('^[a-f0-9]{64}$') &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    match /backups/{userId} {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow list: if isSignedIn() && resource.data.ownerUid == request.auth.uid;
+      allow create: if isVerifiedUser() &&
+        isValidId(userId) &&
+        isOwner(userId) &&
+        isValidEmailBackupHeader(incoming(), userId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser() &&
+        isValidId(userId) &&
+        isOwner(userId) &&
+        isValidEmailBackupHeader(incoming(), userId) &&
+        incoming().ownerUid == existing().ownerUid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'email', 'appVersion', 'deviceName', 'checksum',
+          'messagesCount', 'conversationsCount', 'contactsCount',
+          'autoBackupOnExit', 'profile', 'settings', 'updatedAt'
+        ]);
+      allow delete: if isVerifiedUser() && isValidId(userId) && isOwner(userId);
+
+      match /chunks/{chunkId} {
+        allow get: if isValidId(userId) && isValidId(chunkId) && isOwner(userId) && isParentBackupOwner(userId);
+        allow list: if isSignedIn() && resource.data.ownerUid == request.auth.uid;
+        allow create: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(chunkId) &&
+          isOwner(userId) &&
+          isValidBackupChunk(incoming(), userId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          isParentBackupOwner(userId);
+        allow update: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(chunkId) &&
+          isOwner(userId) &&
+          isValidBackupChunk(incoming(), userId) &&
+          incoming().ownerUid == existing().ownerUid &&
+          incoming().kind == existing().kind &&
+          incoming().chunkIndex == existing().chunkIndex &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['data', 'checksum', 'updatedAt']) &&
+          isParentBackupOwner(userId);
+        allow delete: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(chunkId) &&
+          isOwner(userId) &&
+          isParentBackupOwner(userId);
+      }
+    }
+  }
+}

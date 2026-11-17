@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.whatsappproai.app",
+        "sha256_cert_fingerprints": ["9E:97:C9:1A:8C:BB:A4:03:E4:C8:0E:7E:FC:A2:D6:4A:39:AE:71:FF:72:48:59:CF:77:75:67:6B:A3:5F:B2:4E"]
+      }
+    }]
