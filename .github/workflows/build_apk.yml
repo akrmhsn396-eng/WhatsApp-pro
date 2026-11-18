@@ -28,9 +28,20 @@ jobs:
           npm install --force
           npm run build
 
-      - name: Add and Sync Capacitor Android
+      - name: Configure and Add Capacitor Android
         run: |
           npm install --force @capacitor/core @capacitor/cli @capacitor/android
+          
+          # إنشاء ملف الإعدادات تلقائياً إذا لم يكن موجوداً
+          if [ ! -f "capacitor.config.json" ]; then
+            echo '{
+              "appId": "com.akram.whatsapppro",
+              "appName": "WhatsApp Pro",
+              "webDir": "dist",
+              "bundledWebRuntime": false
+            }' > capacitor.config.json
+          fi
+
           if [ ! -d "android" ]; then
             npx cap add android
           fi
