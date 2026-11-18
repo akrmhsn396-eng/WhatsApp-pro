@@ -1,0 +1,19 @@
+image: mingc/android-build-box:latest
+
+stages:
+  - build
+
+build_apk:
+  stage: build
+  script:
+    - npm install
+    - npm run build
+    - npx cap sync android
+    - cd android
+    - chmod +x gradlew
+    - ./gradlew assembleDebug
+  artifacts:
+    name: "WhatsApp-pro-APK"
+    paths:
+      - android/app/build/outputs/apk/debug/app-debug.apk
+    expire_in: 30 days
