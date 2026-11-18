@@ -47,9 +47,20 @@ jobs:
 
           npx cap sync android
 
-      - name: Build Android APK
+      - name: Fix Kotlin Conflict and Build APK
         run: |
           cd android
+          
+          # إضافة حل جذري لتعارض حزم Kotlin في ملف build.gradle الرئيسي
+          if ! grep -q "resolutionStrategy" build.gradle; then
+            echo '
+            allprojects {
+                configurations.all {
+                    resolutionStrategy.force "org.jetbrains.kotlin:kotlin-stdlib:1.9.0", "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.0"
+                }
+            }' >> build.gradle
+          fi
+
           chmod +x gradlew
           ./gradlew clean assembleDebug
 
