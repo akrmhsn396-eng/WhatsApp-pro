@@ -25,13 +25,13 @@ jobs:
 
       - name: Install dependencies and build web app
         run: |
-          npm install --legacy-peer-deps
+          npm install --force
           npm run build
 
       - name: Setup Capacitor Android (if not present)
         run: |
           if [ ! -d "android" ]; then
-            npm install --legacy-peer-deps @capacitor/core @capacitor/cli @capacitor/android
+            npm install --force @capacitor/core @capacitor/cli @capacitor/android
             npx cap init "WhatsApp Pro" "com.akram.whatsapppro" --web-dir=dist
             npx cap add android
           fi
